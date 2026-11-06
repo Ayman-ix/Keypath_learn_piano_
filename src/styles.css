@@ -356,8 +356,6 @@ body{font-size:14px;line-height:1.5}
 .piano-key.white:hover{transform:translateY(-2px);box-shadow:0 4px 7px #34473420}
 .piano-key.white.is-active{box-shadow:inset 0 -3px 0 #90a58a,0 2px 4px #34473414}
 .key-name{bottom:19px;font-size:9px;color:#667265}
-.computer-key{position:absolute;left:0;right:0;bottom:4px;text-align:center;color:#7b8677;font:600 8px 'DM Sans',sans-serif;pointer-events:none}
-.piano-key.black .computer-key{top:5px;bottom:auto;color:#f7f7f1;font-size:8px}
 .number-note{transition:background .15s,color .15s,transform .15s,box-shadow .15s}
 .number-note:hover{transform:translateY(-2px);box-shadow:0 3px 8px #34473414}
 .number-note.current{box-shadow:inset 0 0 0 1px #d0e0cb,0 2px 8px #53765b12}
@@ -368,7 +366,6 @@ body{font-size:14px;line-height:1.5}
 .song-item.selected{box-shadow:inset 0 0 0 1px #e0e9dc}
 @media(max-width:560px){
   .keyboard-legend>span:last-child{font-size:9px}
-  .computer-key{font-size:7px}
 }
 
 /* Shared alignment, and cinematic transitions that stay out of the learner's way */
@@ -617,3 +614,72 @@ body{font-size:14px;line-height:1.5}
   .fullscreen-close{min-height:36px;padding-inline:9px;font-size:9px}
 }
 @media(prefers-reduced-motion:reduce){.fullscreen-open,.fullscreen-close{transition:none}}
+
+/* Standalone free-play keyboard */
+.virtual-piano-page{width:min(100%,var(--content-width));min-height:calc(100vh - 145px);margin:0 auto;padding:clamp(38px,7vh,76px) var(--page-gutter) 54px}
+.virtual-piano-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:20px;max-width:1120px;margin:0 auto}
+.virtual-piano-heading h1{margin:10px 0 9px;color:#2e352d;font:600 38px/1.15 Manrope,sans-serif;letter-spacing:-1.2px}
+.virtual-piano-heading p{max-width:58ch;margin:0;color:#656b61;font-size:15px;line-height:1.7}
+.virtual-piano-heading .sound-toggle{width:42px;height:42px;flex:none}
+.virtual-piano-controls{display:flex;align-items:center;gap:12px;max-width:1120px;margin:28px auto 12px;color:#687064;font-size:12px}
+.virtual-piano-controls label{font-weight:600}
+.virtual-piano-controls select{min-width:108px;height:36px;padding:0 28px 0 10px;border:1px solid #dfe5da;border-radius:6px;background:#fff;color:#3e5140;font:600 12px 'DM Sans',sans-serif}
+.virtual-piano-controls select:focus-visible{outline:2px solid #789575;outline-offset:2px}
+.virtual-piano-shell{max-width:1120px;margin:0 auto;border:1px solid #e5e8e0;border-radius:12px;background:#fff;padding:16px 18px 18px}
+.virtual-piano-shell .keyboard-legend{margin-bottom:12px}
+.virtual-piano-shell .keyboard-legend>span:first-child{font-size:11px;letter-spacing:.6px}
+.virtual-piano-keyboard{height:clamp(190px,34vh,310px);min-width:700px}
+.virtual-piano-keyboard .key-name{bottom:12px;font-size:12px}
+.keyboard-shortcut-guide{width:min(100%,1120px);margin:10px auto 0;color:#697165;font-size:11px}
+.keyboard-shortcut-guide summary{width:max-content;max-width:100%;cursor:pointer;color:#557258;font-weight:600;text-underline-offset:3px}
+.keyboard-shortcut-guide summary span{color:#848a80;font-weight:400}
+.shortcut-map{display:flex;flex-wrap:wrap;gap:5px 13px;margin-top:8px;color:#656b61}
+.shortcut-map>span{display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
+.shortcut-map kbd{min-width:20px;color:#384137;font:600 10px 'DM Mono',monospace}
+.shortcut-map>span>span{color:#a1a69c}
+.page-piano .footer{margin-top:0}
+@media(max-width:760px){
+  .virtual-piano-page{min-height:calc(100vh - 125px);padding:40px 22px 38px}
+  .virtual-piano-keyboard{height:clamp(170px,28vh,250px)}
+}
+@media(max-width:560px){
+  .main-nav{gap:6px}
+  .main-nav button{font-size:9px}
+  .virtual-piano-page{padding:32px 14px 30px}
+  .virtual-piano-heading h1{font-size:31px}
+  .virtual-piano-heading p{font-size:13px}
+  .virtual-piano-controls{margin-top:20px}
+  .virtual-piano-shell{padding:12px 10px;border-radius:9px}
+  .virtual-piano-shell .keyboard-legend{align-items:center}
+  .virtual-piano-keyboard{height:clamp(160px,26vh,210px);min-width:620px}
+}
+@media(max-width:360px){.main-nav{gap:4px}.main-nav button{font-size:8px}.brand{font-size:14px}}
+
+/* Text-led home introduction */
+.hero{display:block;min-height:0;padding-top:clamp(64px,9vw,112px);padding-bottom:clamp(56px,8vw,96px)}
+.hero-copy{max-width:100%;padding-left:0}
+.hero h1{max-width:900px;margin:0 0 26px;font-size:clamp(48px,6.2vw,76px);line-height:1.04;letter-spacing:-.045em}
+.hero-description{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(260px,.75fr);gap:clamp(24px,5vw,72px);max-width:1020px}
+.hero-description p{max-width:66ch;margin:0;color:#656b61;font-size:clamp(15px,1.35vw,18px);line-height:1.75}
+.hero-description p+p{color:#747a6e}
+.hero-actions{display:flex;align-items:center;gap:26px;margin-top:30px}
+.hero-link{margin-top:0;font-size:14px}
+.hero-secondary{margin:0;font-size:13px}
+.hero h1{max-width:none;font-size:clamp(56px,7vw,96px)}
+.hero-description{display:block;max-width:850px}
+@media(max-width:760px){
+  .hero{padding-top:58px;padding-bottom:52px}
+  .hero-description{grid-template-columns:1fr;gap:14px}
+  .hero h1{font-size:clamp(42px,8vw,58px);margin-bottom:20px}
+}
+@media(max-width:560px){
+  .hero{padding-top:44px;padding-bottom:42px}
+  .hero-description p{font-size:14px;line-height:1.7}
+  .hero-actions{align-items:flex-start;flex-direction:column;gap:15px;margin-top:24px}
+  .hero-secondary{display:block}
+}
+.hero-copy{text-align:center}
+.hero h1,.hero-description{margin-inline:auto}
+.hero-description p{text-align:center}
+.hero-actions{justify-content:center}
+@media(max-width:560px){.hero-actions{align-items:center}}

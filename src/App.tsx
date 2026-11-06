@@ -4,7 +4,7 @@ import { ArrowLeft, ArrowRight, BookOpen, Check, CircleHelp, Clock3, Expand, Fil
 
 type Note = { key: string; midi: number; beat: number; duration: number }
 type Song = { id: string; title: string; artist: string; level: string; duration: string; tag: string; notes: Note[] }
-type Page = 'home' | 'songs' | 'how'
+type Page = 'home' | 'songs' | 'piano' | 'how'
 type Profile = { name: string; age: string; gender: string; avatarData: string }
 type SongProgress = { lastIndex: number; completed: boolean }
 type NoteRange = { start: number; end: number }
@@ -12,7 +12,8 @@ type ViewTransitionDocument = Document & { startViewTransition?: (callback: () =
 const pitchNames = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B']
 const keyLabel = (midi: number) => `${pitchNames[midi % 12]}${Math.floor(midi / 12) - 1}`
 const numberFor = (midi: number) => ({ 0: 1, 2: 2, 4: 3, 5: 4, 7: 5, 9: 6, 11: 7 } as Record<number, number>)[midi % 12] ?? 1
-const computerKeyByMidi: Record<number, string> = { 60: 'A', 61: 'W', 62: 'S', 63: 'E', 64: 'D', 65: 'F', 66: 'T', 67: 'G', 68: 'Y', 69: 'H', 70: 'U', 71: 'J', 72: 'K' }
+const computerKeys = ['A', 'W', 'S', 'E', 'D', 'F', 'T', 'G', 'Y', 'H', 'U', 'J', 'K']
+const computerKeyByMidi: Record<number, string> = Object.fromEntries(computerKeys.map((key, index) => [60 + index, key]))
 const localDayKey = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
 function readLocalRecord<T>(key: string): Record<string, T> {
   try {
@@ -66,13 +67,21 @@ const songs: Song[] = [
   { id: 'amazing-grace', title: 'Amazing Grace', artist: 'Traditional', level: 'Ready for more', duration: '2 min', tag: 'Try a slower tempo', notes: makeNotes([1,4,1,4,6,5,4,2,1,4,1,4,6,5,6,5,4,2,1]) },
 ]
 
-function PianoKey({ midi, active, onPress, wide = false }: { midi: number; active: boolean; onPress: (midi: number) => void; wide?: boolean }) {
+function PianoKey({ midi, active, onPress, wide = false, shortcutKey }: { midi: number; active: boolean; onPress: (midi: number) => void; wide?: boolean; shortcutKey?: string | null }) {
   const black = [1, 3, 6, 8, 10].includes(midi % 12)
-  const computerKey = computerKeyByMidi[midi]
+  const computerKey = shortcutKey === undefined ? computerKeyByMidi[midi] : shortcutKey ?? undefined
   return <button aria-label={`Play ${keyLabel(midi)}${computerKey ? ` with ${computerKey}` : ''}`} onClick={() => onPress(midi)} className={`piano-key ${black ? 'black' : 'white'} ${active ? 'is-active' : ''} ${wide ? 'wide' : ''}`}>
     {!black && <span className="key-name">{keyLabel(midi).replace(/[0-9]/g, '')}</span>}
-    {computerKey && <span className="computer-key" aria-hidden="true">{computerKey}</span>}
   </button>
+}
+
+function KeyboardShortcutGuide({ startMidi = 60 }: { startMidi?: number }) {
+  return <details className="keyboard-shortcut-guide">
+    <summary>Computer keyboard shortcuts <span>({keyLabel(startMidi)} to {keyLabel(startMidi + 12)})</span></summary>
+    <div className="shortcut-map" role="list" aria-label="Computer-key shortcuts for piano notes">
+      {computerKeys.map((key, index) => <span role="listitem" key={key}><kbd>{key}</kbd><span aria-hidden="true">→</span>{keyLabel(startMidi + index)}</span>)}
+    </div>
+  </details>
 }
 
 function Staff({ song, currentIndex, sectionRange, sectionStart, onSelectNote }: { song: Song; currentIndex: number; sectionRange: NoteRange | null; sectionStart: number | null; onSelectNote: (index: number) => void }) {
@@ -132,6 +141,7 @@ function App() {
   const [isPlaying, setIsPlaying] = useState(false)
   const [tempo, setTempo] = useState(82)
   const [soundOn, setSoundOn] = useState(true)
+  const [freePianoOctave, setFreePianoOctave] = useState(3)
   const [activeMidi, setActiveMidi] = useState<number | null>(null)
   const [lessonStarted, setLessonStarted] = useState(false)
   const [showSheetBasics, setShowSheetBasics] = useState(false)
@@ -170,6 +180,8 @@ function App() {
   const filteredSongs = songs.filter(item => (levelFilter === 'all' || item.level === levelFilter) && (durationFilter === 'all' || item.duration === durationFilter))
   const nextSongRecommendation = [...songs.slice(songs.findIndex(item => item.id === songId) + 1), ...songs.slice(0, songs.findIndex(item => item.id === songId))].find(item => item.id !== songId && !songProgress[item.id]?.completed)
   const pianoMidis = useMemo(() => Array.from({ length: 25 }, (_, i) => 48 + i), [])
+  const freePianoStartMidi = 12 * (freePianoOctave + 1)
+  const freePianoMidis = useMemo(() => Array.from({ length: 25 }, (_, i) => freePianoStartMidi + i), [freePianoStartMidi])
   const streakDays = useMemo(() => countStreak(activity), [activity])
   const activityCells = useMemo(() => {
     const today = new Date(); today.setHours(12, 0, 0, 0)
@@ -227,8 +239,9 @@ function App() {
     }
   }, [page])
   useEffect(() => {
-    if (page !== 'songs' || profileOpen || welcomeQuestion) return
-    const noteByComputerKey: Record<string, number> = { a: 60, w: 61, s: 62, e: 63, d: 64, f: 65, t: 66, g: 67, y: 68, h: 69, u: 70, j: 71, k: 72 }
+    if ((page !== 'songs' && page !== 'piano') || profileOpen || welcomeQuestion) return
+    const octaveStart = page === 'piano' ? 12 * (freePianoOctave + 1) : 60
+    const noteByComputerKey: Record<string, number> = Object.fromEntries(computerKeys.map((key, index) => [key.toLowerCase(), octaveStart + index]))
     function playComputerKey(event: KeyboardEvent) {
       if (event.repeat || event.metaKey || event.ctrlKey || event.altKey) return
       const target = event.target
@@ -236,11 +249,12 @@ function App() {
       const midi = noteByComputerKey[event.key.toLowerCase()]
       if (midi === undefined) return
       event.preventDefault()
-      handlePracticeKey(midi)
+      if (page === 'piano') playTone(midi)
+      else handlePracticeKey(midi)
     }
     window.addEventListener('keydown', playComputerKey)
     return () => window.removeEventListener('keydown', playComputerKey)
-  }, [page, profileOpen, welcomeQuestion, soundOn, playAlong, guidedStep, currentIndex, loopRange])
+  }, [page, profileOpen, welcomeQuestion, soundOn, playAlong, guidedStep, currentIndex, loopRange, freePianoOctave])
 
   function playTone(midi: number, duration = 0.42) {
     const activityKey = localDayKey(new Date())
@@ -571,29 +585,26 @@ function App() {
     <a className="skip-link" href="#main-content">Skip to learning area</a>
     <header className="topbar">
       <button className="brand" onClick={() => navigate('home')} aria-label="Keypath home"><span className="brand-mark"><Music2 size={19} strokeWidth={2.2} /></span><span>keypath<span className="brand-period">.</span></span></button>
-      <nav className="main-nav" ref={navRef}><button data-page="home" aria-current={page === 'home' ? 'page' : undefined} className={page === 'home' ? 'active' : ''} onClick={() => navigate('home')}>Home</button><button data-page="songs" aria-current={page === 'songs' ? 'page' : undefined} className={page === 'songs' ? 'active' : ''} onClick={() => navigate('songs')}>Song library</button><button data-page="how" aria-current={page === 'how' ? 'page' : undefined} className={page === 'how' ? 'active' : ''} onClick={() => navigate('how')}>How it works</button><span className="nav-indicator" ref={navIndicatorRef} aria-hidden="true" /></nav>
+      <nav className="main-nav" ref={navRef}><button data-page="home" aria-current={page === 'home' ? 'page' : undefined} className={page === 'home' ? 'active' : ''} onClick={() => navigate('home')}>Home</button><button data-page="songs" aria-current={page === 'songs' ? 'page' : undefined} className={page === 'songs' ? 'active' : ''} onClick={() => navigate('songs')}>Song library</button><button data-page="piano" aria-current={page === 'piano' ? 'page' : undefined} className={page === 'piano' ? 'active' : ''} onClick={() => navigate('piano')}>Play piano</button><button data-page="how" aria-current={page === 'how' ? 'page' : undefined} className={page === 'how' ? 'active' : ''} onClick={() => navigate('how')}>How it works</button><span className="nav-indicator" ref={navIndicatorRef} aria-hidden="true" /></nav>
       <div className="top-actions"><button className="streak" onClick={() => setProfileOpen(true)} aria-label={`Open your profile and ${streakDays} day practice streak`}><Sparkles size={14} /> <b>{streakDays}</b> day streak</button><button className="avatar" onClick={() => setProfileOpen(true)} aria-label="Edit your profile">{profile.avatarData ? <img src={profile.avatarData} alt=""/> : profile.name ? profile.name[0].toUpperCase() : 'A'}</button></div>
     </header>
 
     <main id="main-content" tabIndex={-1}>
       <div className={`page-content page-${page}`} key={page}>
       {page === 'home' && <section className="hero">
-        <div className="hero-copy"><div className="eyebrow"><span className="eyebrow-line" /> YOUR FIRST NOTES START HERE</div>
+        <div className="hero-copy">
           <h1>A first step from<br />curious to <em>confident.</em></h1>
-          <p className="hero-text">Sheet music can feel like a wall of symbols when you’re starting out. Keypath connects each note to a simple number and piano key, so you can play songs while learning how music works.</p>
-          <button onClick={() => navigate('songs')} className="hero-link">Explore the song library <ArrowRight size={16} /></button>
-          <button onClick={() => navigate('how')} className="hero-secondary">See how learning works</button>
-        </div>
-        <div className="hero-art" aria-label="Illustration of a piano keyboard and musical notes">
-          <div className="art-sun" /><div className="art-staff"><span>♪</span><span>♫</span><span>♪</span><span>♩</span></div>
-          <div className="art-pill pill-top"><span className="pill-dot" /> C · 1</div><div className="art-pill pill-side">a little progress, every day <Sparkles size={12} /></div>
-          <div className="art-piano"><div className="art-keys">{Array.from({ length: 12 }, (_, i) => <span key={i} className={i % 7 === 1 || i % 7 === 3 || i % 7 === 6 ? 'mini-black' : ''} />)}</div></div>
-          <div className="art-note note-a">1</div><div className="art-note note-b">5</div><div className="art-note note-c">6</div>
-          <div className="art-spark">✳</div>
+          <div className="hero-description">
+            <p>Traditional sheet music can feel like a wall of symbols when you’re just starting out. Keypath makes the first steps easier to follow by showing each melody as a number, a note on the staff, and the matching piano key—so you can play while you begin to understand how music is written.</p>
+          </div>
+          <div className="hero-actions">
+            <button onClick={() => navigate('songs')} className="hero-link">Explore the song library <ArrowRight size={16} /></button>
+            <button onClick={() => navigate('how')} className="hero-secondary">See how learning works</button>
+          </div>
         </div>
       </section>}
 
-      {page === 'home' && <section className="home-details"><div className="home-section-heading"><span className="section-kicker">A DIFFERENT WAY TO BEGIN</span><h2>Make the first note feel possible.</h2><p>No experience needed. Follow a clear path from seeing a number to finding that note on the piano.</p></div><div className="home-feature-grid"><article><span className="feature-index">01</span><div className="feature-icon">1</div><h3>Numbers make a first step</h3><p>Follow a simple number sequence while you learn which piano keys make each sound.</p></article><article><span className="feature-index">02</span><div className="feature-icon staff-feature">𝄞</div><h3>Sheet music starts to click</h3><p>See the same melody on a staff, so you can grow into reading traditional music at your pace.</p></article><article><span className="feature-index">03</span><div className="feature-icon keys-feature">C <span>→</span> ♫</div><h3>Practice with instant feedback</h3><p>Hear notes, adjust the tempo, and jump to any part you want to try again.</p></article></div><div className="home-lower"><div className="home-song-preview"><div><span className="section-kicker">PICK UP WHERE YOU ARE</span><h2>Start with a song you know.</h2><p>Short, familiar melodies help you focus on learning instead of memorizing.</p></div><div className="preview-songs">{songs.slice(0,6).map((item,i)=><button key={item.id} className={item.id === songId ? 'selected' : ''} onClick={()=>navigate('songs', item.id)}><span className="preview-number">0{i+1}</span><span><b>{item.title}</b><small>{item.level}</small></span><ArrowRight size={14}/></button>)}</div></div></div></section>}
+      {page === 'home' && <section className="home-details"><div className="home-section-heading"><span className="section-kicker">A DIFFERENT WAY TO BEGIN</span><h2>Make the first note feel possible.</h2><p>No experience needed. Follow a clear path from seeing a number to finding that note on the piano.</p></div><div className="home-lower"><div className="home-song-preview"><div><span className="section-kicker">PICK UP WHERE YOU ARE</span><h2>Start with a song you know.</h2><p>Short, familiar melodies help you focus on learning instead of memorizing.</p></div><div className="preview-songs">{songs.slice(0,6).map((item,i)=><button key={item.id} className={item.id === songId ? 'selected' : ''} onClick={()=>navigate('songs', item.id)}><span className="preview-number">0{i+1}</span><span><b>{item.title}</b><small>{item.level}</small></span><ArrowRight size={14}/></button>)}</div></div></div></section>}
 
       {page === 'songs' && <section className="lesson-section" id="songs">
         <div className="section-heading"><div><span className="section-kicker">YOUR PRACTICE SPACE</span><h2>Let’s play something.</h2></div><span className="session-note"><span className="live-dot" /> Your first session <span>·</span> no pressure, just play</span></div>
@@ -628,7 +639,8 @@ function App() {
             <div className="practice-area">
               <div className="practice-intro"><div><span className="practice-kicker">YOUR TURN</span><h4>{playAlong ? currentIndex >= song.notes.length - 1 ? 'Melody complete.' : 'Play the highlighted note.' : currentIndex < 0 ? 'Ready when you are.' : currentIndex >= song.notes.length - 1 ? 'Beautifully done.' : 'Find the highlighted note.'}</h4><p>{playAlong ? 'Use the piano keys or A–K on your keyboard. We’ll wait for each note.' : currentIndex < 0 ? 'Start with a listen, or take it one note at a time.' : currentIndex >= song.notes.length - 1 ? 'You played through the whole melody.' : 'Look for the glowing number, then play that key.'}</p></div><div className="next-note"><span>NEXT NOTE</span><b>{nextNote ? numberFor(nextNote.midi) : '—'}</b><small>{nextNote ? keyLabel(nextNote.midi) : 'complete'}</small></div></div>
               <div className={`practice-feedback ${answerFeedback.startsWith('Correct') || answerFeedback.startsWith('You found') ? 'is-correct' : ''}`} role="status" aria-live="polite">{answerFeedback}</div>
-              <div className="keyboard-shell"><div className="keyboard-legend"><span>PIANO KEYS</span><span>Click a key or use <b>A–K</b> <span className="legend-separator">·</span> C4 is middle C</span><button className="fullscreen-open" onClick={togglePianoFullscreen} aria-label="Expand piano to full screen" title="Full screen piano"><Expand size={15} /><span>Full screen</span></button></div><div className="keyboard-scroll"><div className="piano-keyboard">{pianoMidis.map(midi => <PianoKey key={midi} midi={midi} active={activeMidi === midi || (currentIndex >= 0 && song.notes[currentIndex]?.midi === midi)} onPress={handlePracticeKey} />)}</div></div></div>
+              <div className="keyboard-shell"><div className="keyboard-legend"><span>PIANO KEYS</span><button className="fullscreen-open" onClick={togglePianoFullscreen} aria-label="Expand piano to full screen" title="Full screen piano"><Expand size={15} /><span>Full screen</span></button></div><div className="keyboard-scroll"><div className="piano-keyboard">{pianoMidis.map(midi => <PianoKey key={midi} midi={midi} active={activeMidi === midi || (currentIndex >= 0 && song.notes[currentIndex]?.midi === midi)} onPress={handlePracticeKey} />)}</div></div></div>
+              <KeyboardShortcutGuide />
               <div className="controls-row"><button className={playAlong ? 'playalong-toggle active' : 'playalong-toggle'} onClick={togglePlayAlong} aria-pressed={playAlong}><Music2 size={14} />{playAlong ? 'Play along: on' : 'Play along'}</button><div className="transport"><button className="control-button reset-button" onClick={reset} aria-label="Start over"><RotateCcw size={15} /></button><button className="control-button previous-button" onClick={playPrevious} disabled={currentIndex < 0} aria-label="Previous note"><ArrowLeft size={15} /></button><button className="play-button" onClick={togglePlayback} aria-pressed={isPlaying}>{isPlaying ? <Pause size={15} fill="currentColor" /> : <Play size={15} fill="currentColor" />}<span>{isPlaying ? 'Pause' : 'Listen'}</span></button><button className="control-button next-button" onClick={playNext} disabled={currentIndex >= song.notes.length - 1} aria-label="Play next note"><ArrowRight size={15} /></button></div><label className="tempo-control"><span>TEMPO</span><input aria-label="Playback tempo" aria-valuetext={`${tempo} beats per minute`} type="range" min="50" max="130" value={tempo} onChange={event => setTempo(Number(event.target.value))} /><b>{tempo}</b><small>BPM</small></label></div>
             </div>
             </div>
@@ -638,6 +650,8 @@ function App() {
         {lessonStarted && <div className="below-lesson started-note"><span><Sparkles size={16} /> You’re doing great. Keep going at your own pace.</span><button onClick={() => { setLessonStarted(false); reset() }}>Reset lesson <RotateCcw size={14} /></button></div>}
         <div className="next-song-suggestion"><div><span>{songComplete ? 'Nice work. Try this next:' : 'When you’re ready, try next:'}</span>{nextSongRecommendation ? <><b>{nextSongRecommendation.title}</b><small>{nextSongRecommendation.level} · {nextSongRecommendation.duration}</small></> : <b>You’ve explored every song.</b>}</div>{nextSongRecommendation && <button onClick={() => selectSong(nextSongRecommendation.id)}>Try this song <ArrowRight size={14} /></button>}</div>
       </section>}
+      {page === 'piano' && <section className="virtual-piano-page"><div className="virtual-piano-heading"><div><span className="section-kicker">A LITTLE ROOM TO EXPLORE</span><h1>Play piano, your way.</h1></div><button className="sound-toggle" onClick={() => setSoundOn(value => !value)} aria-label={soundOn ? 'Mute piano sound' : 'Turn piano sound on'} title={soundOn ? 'Mute sound' : 'Turn sound on'}>{soundOn ? <Volume2 size={17} /> : <VolumeX size={17} />}</button></div><div className="virtual-piano-controls"><label htmlFor="virtual-piano-octave">Octave range</label><select id="virtual-piano-octave" aria-label="Choose two-octave piano range" value={freePianoOctave} onChange={event => setFreePianoOctave(Number(event.target.value))}>{[2, 3, 4, 5].map(octave => <option key={octave} value={octave}>C{octave}–C{octave + 2}</option>)}</select></div><div className="virtual-piano-shell"><div className="keyboard-legend"><span>VIRTUAL PIANO</span></div><div className="keyboard-scroll"><div className="piano-keyboard virtual-piano-keyboard">{freePianoMidis.map((midi, index) => <PianoKey key={midi} midi={midi} active={activeMidi === midi} shortcutKey={index < computerKeys.length ? computerKeys[index] : null} onPress={playTone} />)}</div></div></div><KeyboardShortcutGuide startMidi={freePianoStartMidi} /></section>}
+
       {page === 'how' && <section className="how-page"><div className="how-intro"><span className="section-kicker">YOUR LEARNING PATH</span><h1>From first note to<br/><em>reading music.</em></h1><p>Build confidence in small steps. Use numbers as a guide while your eyes get used to the sheet music.</p></div><div className="how-steps"><article><span>01</span><div className="how-illustration">1 · 2 · 3</div><h3>Start with a number</h3><p>In our C-major examples, each number points to a note: C is 1, D is 2, and so on.</p></article><article><span>02</span><div className="how-illustration staff-illustration">𝄞 <b>• • •</b></div><h3>Connect it to the staff</h3><p>Follow the same note on the five lines and learn treble-clef note names as you play.</p></article><article><span>03</span><div className="how-illustration">C <b>→</b> ♫</div><h3>Find it on the piano</h3><p>Play the matching key, listen, and repeat at a speed that feels comfortable.</p></article></div><div className="how-cheatsheet"><div><span className="section-kicker">A QUICK CHEAT SHEET</span><h2>Reading the treble clef</h2><p>Start at the bottom line and move upward, one letter at a time.</p><div className="cheat-staff"><span>F — Every</span><span>D — Good</span><span>B — Bird</span><span>G — Does</span><span>E — Fly</span></div><p className="space-reminder">The spaces spell F · A · C · E</p></div><div className="number-cheats">{['C','D','E','F','G','A','B'].map((letter,i)=><span key={letter}><b>{letter}</b><small>{i+1}</small></span>)}</div></div><button className="how-start" onClick={() => navigate('songs')}>Choose a song to practise <ArrowRight size={16}/></button></section>}
       </div>
       {profileOpen && <div className="modal-backdrop" onMouseDown={event => { if (event.target === event.currentTarget) setProfileOpen(false) }}><form className="profile-modal" onSubmit={saveProfile}><button type="button" className="modal-close" aria-label="Close profile" onClick={() => setProfileOpen(false)}><X size={17}/></button><span className="section-kicker">YOUR KEYPATH PROFILE</span><h2>Your practice, your story.</h2><p>Keep track of the days you show up. Your details and practice history stay on this device.</p><div className="profile-photo-row"><div className="profile-large-avatar">{profile.avatarData ? <img src={profile.avatarData} alt="Your profile"/> : profile.name ? profile.name[0].toUpperCase() : <Music2 size={23}/>}</div><label className="photo-change">Choose a profile photo<input type="file" accept="image/*" onChange={uploadAvatar}/></label>{profile.avatarData && <button type="button" className="remove-photo" onClick={()=>setProfile({...profile,avatarData:''})}>Remove</button>}</div><div className="profile-fields"><label>Your name<input value={profile.name} onChange={event => setProfile({...profile,name:event.target.value})} placeholder="What should we call you?" maxLength={40}/></label><label>Your age <span className="optional">optional</span><input type="number" min="5" max="120" value={profile.age} onChange={event => setProfile({...profile,age:event.target.value})} placeholder="Age"/></label><label>Gender <span className="optional">optional</span><select value={profile.gender} onChange={event => setProfile({...profile,gender:event.target.value})}><option value="">Prefer not to say</option><option>Female</option><option>Male</option><option>Non-binary</option><option>Self-describe</option></select></label></div><div className="profile-stats" aria-label="Practice totals"><div><Check size={15}/><b>{completedSongCount}</b><span>Songs completed</span></div><div><Clock3 size={15}/><b>{practiceMinutes}</b><span>Practice minutes</span></div><div><Music2 size={15}/><b>{activeDaysCount}</b><span>Active days</span></div></div><div className="practice-year"><div className="practice-year-heading"><div><b>Your practice year</b><small>{activeDaysCount} active days · {streakDays} day current streak</small></div><span className="streak-badge"><Sparkles size={13}/>{streakDays}</span></div><div className="calendar-month-labels"><span>Nov</span><span>Jan</span><span>Mar</span><span>May</span><span>Jul</span><span>Sep</span></div><div className="calendar-scroll"><div className="practice-calendar" aria-label="Practice activity for the past year">{activityCells.map(cell=><span key={cell.key} title={cell.title} aria-label={cell.title || 'Future date'} className={`calendar-day level-${cell.count === 0 ? 0 : cell.count < 4 ? 1 : cell.count < 10 ? 2 : cell.count < 20 ? 3 : 4} ${cell.future ? 'future' : ''}`}/>)}</div></div><div className="calendar-legend"><span>{encouragement}</span><div>Less <i className="level-0"/><i className="level-1"/><i className="level-2"/><i className="level-3"/><i className="level-4"/> More</div></div></div><button className="save-profile" type="submit">Save profile <Check size={15}/></button></form></div>}
